@@ -42,5 +42,5 @@ package() {
 	make DESTDIR="$pkgdir" install || return 1
 }
 
-md5sums="b565e6831d3801822ac19c6c88ad6764  libbncsutil-560.tar.bz2
-dfd53f2a91253244968f3889f9d0d8e9  support-DESTDIR-Makefile.patch"
+md5sums="d2032b72bb9644c30294a7fb8b8b7bcc  libbncsutil-560.tar.bz2
+3861874ae144f59bd2eaaf358ef56ef2  support-DESTDIR-Makefile.patch"
