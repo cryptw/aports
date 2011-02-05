@@ -7,7 +7,7 @@ pkgdesc="Warcraft III Game Hosting Bot"
 url="http://ghostplusplus.googlecode.com"
 arch="all"
 license="APACHE"
-depends="boost boost-date_time boost-filesystem boost-regex boost-thread libmysqlclient libstorm libbncsutil"
+depends="boost boost-regex libmysqlclient"
 depends_dev="subversion boost-dev mysql-dev zlib-dev libstorm libbncsutil"
 makedepends="$depends_dev"
 install=""
@@ -35,8 +35,9 @@ build() {
 }
 
 package() {
+	cd "$_builddir"
 	make DESTDIR="$pkgdir" install || return 1
 }
 
 md5sums="0ae6ed2c5238f839d44fb52275e6f5ad  ghostplusplus-560.tar.bz2
-ea1180f5bd8713089f5d9fe14240c568  CWWH-Alpine-tweaks.patch"
+1ac9c7c6a3af1c311e7c8dfb90145c88  CWWH-Alpine-tweaks.patch"

@@ -84,17 +84,20 @@ Index: Makefile
 ===================================================================
 --- Makefile	(revision 560)
 +++ Makefile	(working copy)
-@@ -51,6 +51,9 @@
+@@ -51,6 +51,12 @@
  
  all: $(PROGS)
  
++install: ./ghost++
++	install -Dm 0755 ./ghost++ $(DESTDIR)/usr/bin/ghost++
++
 +version.h: bncsutilinterface.h bnet.h bnetprotocol.h bnlsclient.h bnlsprotocol.h commandpacket.h config.h crc32.h csvparser.h game.h game_admin.h game_base.h gameplayer.h gameprotocol.h gameslot.h ghost.h ghostdb.h ghostdbmysql.h ghostdbsqlite.h gpsprotocol.h includes.h language.h map.h ms_stdint.h next_combination.h packed.h replay.h savegame.h sha1.h socket.h sqlite3.h sqlite3ext.h stats.h statsdota.h statsw3mmd.h util.h bncsutilinterface.cpp bnet.cpp bnetprotocol.cpp bnlsclient.cpp bnlsprotocol.cpp commandpacket.cpp config.cpp crc32.cpp csvparser.cpp game.cpp game_admin.cpp game_base.cpp gameplayer.cpp gameprotocol.cpp gameslot.cpp ghost.cpp ghostdb.cpp ghostdbmysql.cpp ghostdbsqlite.cpp gpsprotocol.cpp language.cpp map.cpp packed.cpp replay.cpp savegame.cpp sha1.cpp socket.cpp stats.cpp statsdota.cpp statsw3mmd.cpp util.cpp Makefile
 +	echo "m_Version = \"r`svnversion`\";" > version.h
 +
  bncsutilinterface.o: ghost.h includes.h util.h bncsutilinterface.h
  bnet.o: ghost.h includes.h util.h config.h language.h socket.h commandpacket.h ghostdb.h bncsutilinterface.h bnlsclient.h bnetprotocol.h bnet.h map.h packed.h savegame.h replay.h gameprotocol.h game_base.h
  bnetprotocol.o: ghost.h includes.h util.h bnetprotocol.h
-@@ -66,7 +69,7 @@
+@@ -66,7 +72,7 @@
  gameplayer.o: ghost.h includes.h util.h language.h socket.h commandpacket.h bnet.h map.h gameplayer.h gameprotocol.h gpsprotocol.h game_base.h
  gameprotocol.o: ghost.h includes.h util.h crc32.h gameplayer.h gameprotocol.h game_base.h
  gameslot.o: ghost.h includes.h gameslot.h
@@ -402,4 +405,3 @@ Index: bnet.cpp
  				{
  					string StatsUser = User;
  
-
