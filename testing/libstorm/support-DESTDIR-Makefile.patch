@@ -20,7 +20,7 @@ Index: Makefile
 -	cp StormLib.h /usr/local/include/StormLib
 -	cp StormPort.h /usr/local/include/StormLib
 -	ldconfig
-+	mkdir -p $(DESTDIR)/usr/include/StormLib $(DESTDIR)/usr/lib
++	mkdir -p $(DESTDIR)/usr/include/stormlib $(DESTDIR)/usr/lib
 +	install $(LIB) $(DESTDIR)/usr/lib
-+	cp StormLib.h $(DESTDIR)/usr/include/StormLib
-+	cp StormPort.h $(DESTDIR)/usr/include/StormLib
++	cp StormLib.h $(DESTDIR)/usr/include/stormlib
++	cp StormPort.h $(DESTDIR)/usr/include/stormlib
