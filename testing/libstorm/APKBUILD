@@ -40,5 +40,5 @@ package() {
 	cd "$_builddir"
 	make DESTDIR="$pkgdir" install || return 1
 }
-md5sums="3962e04d1507aea0a48b785dedbc3ed9  libstorm-560.tar.bz2
+md5sums="62b90f22179e82b2364a6c46a43dcc68  libstorm-560.tar.bz2
 99512f149efac24a86562e60d64cc0fe  support-DESTDIR-Makefile.patch"
