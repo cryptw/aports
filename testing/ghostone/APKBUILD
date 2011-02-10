@@ -1,0 +1,42 @@
+# Contributor: CryptWizard <cryptwizard@gmail.com>
+# Maintainer: CryptWizard <cryptwizard@gmail.com>
+pkgname=ghostone
+pkgver=258
+pkgrel=0
+pkgdesc="Unstable Warcraft III Game Hosting Bot with 9001 unnecessary features"
+url="http://ghostone.googlecode.com"
+arch="all"
+license="APACHE"
+depends="boost boost-regex libmysqlclient"
+depends_dev="subversion boost-dev mysql-dev zlib-dev libstorm libbncsutil"
+makedepends="$depends_dev"
+install=""
+subpackages=""
+source="
+	http://alpine-nl.cryptwizard.info/~cryptw-packaging/$pkgname-$pkgver.tar.bz2
+	CWWH-Alpine-tweaks.patch
+"
+
+_builddir="$srcdir"/"$pkgname"-"$pkgver"
+
+prepare() {
+	local i
+	cd "$_builddir"
+	for i in $source; do
+		case $i in
+		*.patch) msg $i; patch -p0 -i "$srcdir"/$i || return 1;;
+		esac
+	done
+}
+
+build() {
+	cd "$_builddir"
+	make -j1 || return 1
+}
+
+package() {
+	cd "$_builddir"
+	make DESTDIR="$pkgdir" install || return 1
+}
+md5sums="f3caf0c46d92251773fbf07b82c4f74d  ghostone-258.tar.bz2
+44939e200c344e230d0981588dcd62fb  CWWH-Alpine-tweaks.patch"
