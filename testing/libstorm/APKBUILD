@@ -2,7 +2,7 @@
 # Maintainer: CryptWizard <cryptwizard@gmail.com>
 pkgname=libstorm
 pkgver=560
-pkgrel=1
+pkgrel=3
 pkgdesc="MPQ (Blizzard Archive) Access Library"
 url="https://code.google.com/p/ghostplusplus/source/browse/?r=$pkgver#svn%2Ftrunk%2FStormLib%2Fstormlib"
 arch="all"
@@ -41,4 +41,4 @@ package() {
 	make DESTDIR="$pkgdir" install || return 1
 }
 md5sums="8b2ea0f9181999107d6bdf633fc7a0be  libstorm-560.tar.bz2
-e66cde3f5d573e0093efd87e259fae94  support-DESTDIR-Makefile.patch"
+282580909e6d35ec2060237fffe38ae0  support-DESTDIR-Makefile.patch"

@@ -1,3 +1,263 @@
+Index: SListFile.cpp
+===================================================================
+--- SListFile.cpp	(revision 560)
++++ SListFile.cpp	(working copy)
+@@ -307,7 +307,7 @@
+         GetListFileName(ha, szListFile);
+         hFile = CreateFile(szListFile, GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
+         if(hFile == INVALID_HANDLE_VALUE)
+-            nError = GetLastError();
++            nError = StormGetLastError();
+     }
+ 
+     // Find the hash entry corresponding to listfile
+@@ -400,8 +400,13 @@
+     // Open the local/internal listfile
+     if(nError == ERROR_SUCCESS)
+     {
+-        if(!SFileOpenFileEx((HANDLE)ha, szListFile, dwSearchScope, &hListFile))
+-            nError = GetLastError();
++        BOOL tmp = SFileOpenFileEx((HANDLE)ha, szListFile, dwSearchScope, &hListFile);
++        if (!tmp)
++        {
++            nError = StormGetLastError();
++            //printf("SFileOpenFileEx didn't succeed. nError == %d\r\n", nError);
++        }
++        //printf("SFileOpenFileEx returned %d.\r\n", tmp);
+     }
+ 
+     if(nError == ERROR_SUCCESS)
+@@ -411,10 +416,14 @@
+ 
+         // Try to allocate memory for the complete file. If it fails,
+         // load the part of the file
+-        pCache = (TListFileCache *)ALLOCMEM(char, (sizeof(TListFileCache) + dwCacheSize));
++        //printf("libStorm: ALLOCMEM(char, %d); sizeof(TListFileCache) == %d; dwCacheSize == %d\r\n",
++        //    sizeof(TListFileCache) + dwCacheSize, sizeof(TListFileCache), dwCacheSize);
++        pCache = (TListFileCache *)ALLOCMEM(char, sizeof(TListFileCache) + dwCacheSize);
+         if(pCache == NULL)
+         {
+             dwCacheSize = LISTFILE_CACHE_SIZE;
++            //printf("libStorm: ALLOCMEM(char, %d); sizeof(TListFileCache) == %d; dwCacheSize == %d\r\n",
++            //    sizeof(TListFileCache) + dwCacheSize, sizeof(TListFileCache), dwCacheSize);
+             pCache = (TListFileCache *)ALLOCMEM(char, sizeof(TListFileCache) + dwCacheSize);
+         }
+ 
+@@ -478,7 +487,7 @@
+     if(nError == ERROR_SUCCESS)
+     {
+         if(!SFileOpenFileEx((HANDLE)ha, szListFile, dwSearchScope, &hListFile))
+-            nError = GetLastError();
++            nError = StormGetLastError();
+     }
+ 
+     if(nError == ERROR_SUCCESS)
+Index: SFileCompactArchive.cpp
+===================================================================
+--- SFileCompactArchive.cpp	(revision 560)
++++ SFileCompactArchive.cpp	(working copy)
+@@ -209,7 +209,7 @@
+         FilePos.LowPart = pBlock->dwFilePos;
+         FilePos.QuadPart += ha->MpqPos.QuadPart;
+         if(SetFilePointer(ha->hFile, FilePos.LowPart, &FilePos.HighPart, FILE_BEGIN) != FilePos.LowPart)
+-            nError = GetLastError();
++            nError = StormGetLastError();
+     }
+ 
+     // Remember the position in the destination file
+@@ -512,7 +512,7 @@
+ 
+         hFile = CreateFile(szTempFile, GENERIC_READ|GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, 0, NULL);
+         if(hFile == INVALID_HANDLE_VALUE)
+-            nError = GetLastError();
++            nError = StormGetLastError();
+     }
+ 
+     // Write the data before MPQ header (if any)
+@@ -654,7 +654,7 @@
+         if(!DeleteFile(ha->szFileName) ||           // Delete the old archive
+            !CloseHandle(ha->hFile)     ||           // Close the new archive
+            !MoveFile(szTempFile, ha->szFileName))   // Rename the temporary archive
+-            nError = GetLastError();
++            nError = StormGetLastError();
+     }
+ 
+     // Now open the freshly renamed archive file
+@@ -662,7 +662,7 @@
+     {
+         ha->hFile = CreateFile(ha->szFileName, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+         if(ha->hFile == INVALID_HANDLE_VALUE)
+-            nError = GetLastError();
++            nError = StormGetLastError();
+     }
+ 
+     // Invalidate the positions of the archive
+Index: SCommon.cpp
+===================================================================
+--- SCommon.cpp	(revision 560)
++++ SCommon.cpp	(working copy)
+@@ -893,7 +893,7 @@
+         if(dwTransferred == dwBlockPosLen)
+             hf->pBlock->dwCSize += dwBlockPosLen;
+         else
+-            nError = GetLastError();
++            nError = StormGetLastError();
+     }
+ 
+     // Write all file blocks
+Index: StormPort.h
+===================================================================
+--- StormPort.h	(revision 560)
++++ StormPort.h	(working copy)
+@@ -239,10 +239,10 @@
+   #define _stricmp strcasecmp
+   #define _strnicmp strncasecmp
+   
+-  extern int globalerr;
++  //extern int globalerr;
+   
+   void  SetLastError(int err);
+-  int   GetLastError();
++  int   StormGetLastError();
+   char *ErrString(int err);
+ 
+   // Emulation of functions for file I/O available in Win32
+Index: SFileOpenFileEx.cpp
+===================================================================
+--- SFileOpenFileEx.cpp	(revision 560)
++++ SFileOpenFileEx.cpp	(working copy)
+@@ -404,7 +404,7 @@
+         {
+             // If the file is encrypted and not compressed, we cannot detect the file seed
+             if(SFileGetFileName(hf, hf->szFileName) == FALSE)
+-                nError = GetLastError();
++                nError = StormGetLastError();
+         }
+     }
+ 
+@@ -419,14 +419,26 @@
+             hf->pMd5 = ha->pAttributes->pMd5 + dwBlockIndex;
+     }
+ 
++    // HACK: Final check
++    if (hf == NULL)
++    {
++        nError = ERROR_FILE_NOT_FOUND;
++        //printf("hf is NULL.\r\n");
++    }
++
+     // Cleanup
+     if(nError != ERROR_SUCCESS)
+     {
+-        FreeMPQFile(hf);
++        if (hf != NULL)
++        {
++            FreeMPQFile(hf);
++        }
+         SetLastError(nError);
++        //printf("Ran SetLastError(%d).\r\n", nError);
+     }
+ 
+     *phFile = hf;
++    //printf("nError == %d\r\n", nError);
+     return (nError == ERROR_SUCCESS);
+ }
+ 
+Index: SFileCreateArchiveEx.cpp
+===================================================================
+--- SFileCreateArchiveEx.cpp	(revision 560)
++++ SFileCreateArchiveEx.cpp	(working copy)
+@@ -338,7 +338,7 @@
+                            0,
+                            NULL);
+         if(hFile == INVALID_HANDLE_VALUE)
+-            nError = GetLastError();
++            nError = StormGetLastError();
+     }
+ 
+     // Retrieve the file size and round it up to 0x200 bytes
+@@ -358,14 +358,14 @@
+     if(nError == ERROR_SUCCESS)
+     {
+         if(SetFilePointer(hFile, MpqPos.LowPart, &MpqPos.HighPart, FILE_BEGIN) == 0xFFFFFFFF)
+-            nError = GetLastError();
++            nError = StormGetLastError();
+     }
+ 
+     // Set the new end of the file to the MPQ header position
+     if(nError == ERROR_SUCCESS)
+     {
+         if(!SetEndOfFile(hFile))
+-            nError = GetLastError();
++            nError = StormGetLastError();
+     }
+ 
+     // Create the archive handle
+@@ -393,7 +393,7 @@
+         ha->dwFlags       |= MPQ_FLAG_CHANGED;
+ 
+         if(!ha->pHashTable || !ha->pBlockTable || !ha->pExtBlockTable || !ha->pbBlockBuffer)
+-            nError = GetLastError();
++            nError = StormGetLastError();
+         hFile = INVALID_HANDLE_VALUE;
+     }
+ 
+@@ -540,7 +540,7 @@
+     {
+         hFile = CreateFile(szFileName, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, NULL);
+         if(hFile == INVALID_HANDLE_VALUE)
+-            nError = GetLastError();
++            nError = StormGetLastError();
+     }
+ 
+     if(nError == ERROR_SUCCESS)
+Index: SFileOpenArchive.cpp
+===================================================================
+--- SFileOpenArchive.cpp	(revision 560)
++++ SFileOpenArchive.cpp	(working copy)
+@@ -139,7 +139,7 @@
+     {
+         hFile = CreateFile(szMpqName, dwAccessMode, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+         if(hFile == INVALID_HANDLE_VALUE)
+-            nError = GetLastError();
++            nError = StormGetLastError();
+     }
+     
+     // Allocate the MPQhandle
+Index: StormPortLinux.cpp
+===================================================================
+--- StormPortLinux.cpp	(revision 560)
++++ StormPortLinux.cpp	(working copy)
+@@ -32,10 +32,12 @@
+ void SetLastError(int err)
+ {
+     globalerr = err;
++    //printf("globalerr = %d.\r\n", globalerr);
+ }
+ 
+-int GetLastError()
++int StormGetLastError()
+ {
++    //printf("StormGetLastError returning %d.", globalerr);
+     return(globalerr);
+ }
+ 
+Index: StormPortMac.cpp
+===================================================================
+--- StormPortMac.cpp	(revision 560)
++++ StormPortMac.cpp	(working copy)
+@@ -170,9 +170,9 @@
+ }
+ 
+ /********************************************************************
+-*	 GetLastError
++*	 StormGetLastError
+ ********************************************************************/
+-int GetLastError()
++int StormGetLastError()
+ {
+ 	return globalerr;
+ }
 Index: Makefile
 ===================================================================
 --- Makefile	(revision 560)
@@ -24,3 +284,56 @@ Index: Makefile
 +	install $(LIB) $(DESTDIR)/usr/lib
 +	cp StormLib.h $(DESTDIR)/usr/include/stormlib
 +	cp StormPort.h $(DESTDIR)/usr/include/stormlib
+Index: SFileExtractFile.cpp
+===================================================================
+--- SFileExtractFile.cpp	(revision 560)
++++ SFileExtractFile.cpp	(working copy)
+@@ -26,7 +26,7 @@
+         if((DWORD_PTR)szToExtract <= 0x10000)
+             dwSearchScope = SFILE_OPEN_BY_INDEX;
+         if(!SFileOpenFileEx(hMpq, szToExtract, dwSearchScope, &hMpqFile))
+-            nError = GetLastError();
++            nError = StormGetLastError();
+     }
+ 
+     // Create the local file
+@@ -34,7 +34,7 @@
+     {
+         hLocalFile = CreateFile(szExtracted, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, 0, NULL);
+         if(hLocalFile == INVALID_HANDLE_VALUE)
+-            nError = GetLastError();
++            nError = StormGetLastError();
+     }
+ 
+     // Copy the file's content
+@@ -48,7 +48,7 @@
+             // dwTransferred is only set to nonzero if something has been read.
+             // nError can be ERROR_SUCCESS or ERROR_HANDLE_EOF
+             if(!SFileReadFile(hMpqFile, szBuffer, sizeof(szBuffer), &dwTransferred, NULL))
+-                nError = GetLastError();
++                nError = StormGetLastError();
+             if(nError == ERROR_HANDLE_EOF)
+                 nError = ERROR_SUCCESS;
+             if(dwTransferred == 0)
+Index: SAttrFile.cpp
+===================================================================
+--- SAttrFile.cpp	(revision 560)
++++ SAttrFile.cpp	(working copy)
+@@ -105,7 +105,7 @@
+     // Attempt to open the "(attributes)" file.
+     // If it's not there, we don't support attributes
+     if(!SFileOpenFileEx((HANDLE)ha, ATTRIBUTES_NAME, 0, &hFile))
+-        nError = GetLastError();
++        nError = StormGetLastError();
+ 
+     // Allocate space for the TMPQAttributes
+     if(nError == ERROR_SUCCESS)
+@@ -219,7 +219,7 @@
+         GetAttributesFileName(ha, szAttrFile);
+         hFile = CreateFile(szAttrFile, GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
+         if(hFile == INVALID_HANDLE_VALUE)
+-            nError = GetLastError();
++            nError = StormGetLastError();
+     }
+ 
+     // Write the content of the attributes to the file
