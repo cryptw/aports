@@ -1,0 +1,15 @@
+Index: Makefile
+===================================================================
+--- Makefile	(revision 560)
++++ Makefile	(working copy)
+@@ -30,7 +30,6 @@
+ 	make $(TARGET)
+ 
+ install: $(TARGET)
+-	mkdir -p /usr/include/bncsutil
+-	cp *.h /usr/include/bncsutil
+-	cp $(TARGET) /usr/lib
+-	ldconfig
++	mkdir -p $(DESTDIR)/usr/include/bncsutil $(DESTDIR)/usr/lib
++	cp *.h $(DESTDIR)/usr/include/bncsutil
++	cp $(TARGET) $(DESTDIR)/usr/lib

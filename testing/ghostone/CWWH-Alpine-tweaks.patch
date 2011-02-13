@@ -1,0 +1,186 @@
+Index: Makefile
+===================================================================
+--- Makefile	(revision 258)
++++ Makefile	(working copy)
+@@ -51,6 +51,11 @@
+ 
+ all: $(PROGS)
+ 
++install: ./ghost++
++	install -Dm 0755 ./ghost++ $(DESTDIR)/usr/bin/ghostone
++
++version.h: bncsutilinterface.cpp bnet.cpp bnetprotocol.cpp bnlsclient.cpp bnlsprotocol.cpp commandpacket.cpp config.cpp crc32.cpp csvparser.cpp game.cpp game_admin.cpp game_base.cpp gameplayer.cpp gameprotocol.cpp gameslot.cpp ghost.cpp ghostdb.cpp ghostdbmysql.cpp ghostdbsqlite.cpp gpsprotocol.cpp items.cpp language.cpp map.cpp packed.cpp replay.cpp savegame.cpp sha1.cpp socket.cpp stats.cpp statsdota.cpp statsw3mmd.cpp util.cpp bncsutilinterface.h bnet.h bnetprotocol.h bnlsclient.h bnlsprotocol.h commandpacket.h config.h crc32.h csvparser.h dirent.h game.h game_admin.h game_base.h gameplayer.h gameprotocol.h gameslot.h ghost.h ghostdb.h ghostdbmysql.h ghostdbsqlite.h gpsprotocol.h includes.h items.h language.h map.h ms_stdint.h next_combination.h packed.h replay.h savegame.h sha1.h socket.h sqlite3.h sqlite3ext.h stats.h statsdota.h statsw3mmd.h util.h Makefile
++	echo "m_GHostVersion = \"r`svnversion` One\";" > version.h
+ bncsutilinterface.o: ghost.h includes.h util.h bncsutilinterface.h
+ bnet.o: ghost.h includes.h util.h config.h language.h socket.h commandpacket.h ghostdb.h bncsutilinterface.h bnlsclient.h bnetprotocol.h bnet.h map.h packed.h savegame.h replay.h gameprotocol.h game_base.h
+ bnetprotocol.o: ghost.h includes.h util.h bnetprotocol.h
+@@ -66,7 +71,7 @@
+ gameplayer.o: ghost.h includes.h util.h language.h socket.h commandpacket.h bnet.h map.h gameplayer.h gameprotocol.h gpsprotocol.h game_base.h
+ gameprotocol.o: ghost.h includes.h util.h crc32.h gameplayer.h gameprotocol.h game_base.h
+ gameslot.o: ghost.h includes.h gameslot.h
+-ghost.o: ghost.h includes.h util.h crc32.h sha1.h csvparser.h config.h language.h socket.h ghostdb.h ghostdbsqlite.h ghostdbmysql.h bnet.h map.h packed.h savegame.h gameplayer.h gameprotocol.h gpsprotocol.h game_base.h game.h game_admin.h
++ghost.o: ghost.h includes.h util.h crc32.h sha1.h csvparser.h config.h language.h socket.h ghostdb.h ghostdbsqlite.h ghostdbmysql.h bnet.h map.h packed.h savegame.h gameplayer.h gameprotocol.h gpsprotocol.h game_base.h game.h game_admin.h version.h
+ ghostdb.o: ghost.h includes.h util.h config.h ghostdb.h
+ ghostdbmysql.o: ghost.h includes.h util.h config.h ghostdb.h ghostdbmysql.h
+ ghostdbsqlite.o: ghost.h includes.h util.h config.h ghostdb.h ghostdbsqlite.h
+Index: game_base.cpp
+===================================================================
+--- game_base.cpp	(revision 258)
++++ game_base.cpp	(working copy)
+@@ -2717,6 +2717,11 @@
+ 				JoinedRealm = (*i)->GetServer( );
+ 		}
+ 	}
++	else
++	{
++		potential->SetDeleteMe( true );
++		return;
++	}
+ 
+ 	bool Reserved = IsReserved( joinPlayer->GetName( ) ) || AdminCheck || IsOwner( joinPlayer->GetName( )) || SafeCheck;
+ 
+@@ -3388,7 +3393,8 @@
+ 	if( JoinedRealm.empty( ) )
+ 		Player->SetSpoofed( true );
+ 
+-	Player->SetWhoisShouldBeSent( m_GHost->m_SpoofChecks == 1 || ( m_GHost->m_SpoofChecks == 2 && AnyAdminCheck ) );
++	//Player->SetWhoisShouldBeSent( m_GHost->m_SpoofChecks == 1 || ( m_GHost->m_SpoofChecks == 2 && AnyAdminCheck ) );
++	Player->SetWhoisShouldBeSent( m_GHost->m_SpoofChecks == 2 && AnyAdminCheck );
+ 	m_Players.push_back( Player );
+ 	potential->SetSocket( NULL );
+ 	potential->SetDeleteMe( true );
+@@ -3949,7 +3955,8 @@
+ 	if( JoinedRealm.empty( ) )
+ 		Player->SetSpoofed( true );
+ 
+-	Player->SetWhoisShouldBeSent( m_GHost->m_SpoofChecks == 1 || ( m_GHost->m_SpoofChecks == 2 && AnyAdminCheck ) );
++	//Player->SetWhoisShouldBeSent( m_GHost->m_SpoofChecks == 1 || ( m_GHost->m_SpoofChecks == 2 && AnyAdminCheck ) );
++	Player->SetWhoisShouldBeSent( m_GHost->m_SpoofChecks == 2 && AnyAdminCheck );
+ 	Player->SetSID( SID );
+ 	Player->SetScore( score );
+ 	m_Players.push_back( Player );
+@@ -7613,10 +7620,7 @@
+ 
+ 		ReCalculateTeams();
+ 		uint32_t PNr;
+-		if (m_GetMapNumTeams<=4)
+-			PNr = GetNumHumanPlayers();
+-		else
+-			PNr = m_Team1+m_Team2+m_Team3+m_Team4;
++		PNr = GetNumHumanPlayers();
+ 		if( PNr < m_AutoStartPlayers )
+ 		{
+ 			string s = string();
+Index: ghost.cpp
+===================================================================
+--- ghost.cpp	(revision 258)
++++ ghost.cpp	(working copy)
+@@ -948,7 +948,7 @@
+ 	m_Exiting = false;
+ 	m_ExitingNice = false;
+ 	m_Enabled = true;
+-	m_GHostVersion = "17.1 One";
++#include "version.h"
+ 	m_Version = "("+m_GHostVersion+")";
+ 	stringstream SS;
+ 	string istr = string();
+@@ -983,7 +983,8 @@
+ 		CONSOLE_Print( "[GHOST] acting as Warcraft III: Reign of Chaos" );
+ 
+ 	m_Reconnect = CFG->GetInt( "bot_reconnect", 1 ) == 0 ? false : true;
+-	m_ReconnectPort = CFG->GetInt( "bot_reconnectport", 6114 );
++	//m_ReconnectPort = CFG->GetInt( "bot_reconnectport", 6114 );
++	// done later
+ 	m_ScoresCount = 0;
+ 	m_ScoresCountSet = false;
+ 	m_AutoHosted = false;
+@@ -2124,7 +2125,7 @@
+ 	delete m_Language;
+ 	m_Language = new CLanguage( m_LanguageFile );
+ 	m_Warcraft3Path = UTIL_AddPathSeperator( CFG->GetString( "bot_war3path", "C:\\Program Files\\Warcraft III\\" ) );
+-	m_BindAddress = CFG->GetString( "bot_bindaddress", string( ) );
++	m_BindAddress = CFG->GetString( "bot_bindaddress", string("255.255.255.255") );
+ 	m_ReconnectWaitTime = CFG->GetInt( "bot_reconnectwaittime", 3 );
+ 	m_MaxGames = CFG->GetInt( "bot_maxgames", 5 );
+ 	string BotCommandTrigger = CFG->GetString( "bot_commandtrigger", "!" );
+@@ -2252,7 +2253,7 @@
+ 
+ void CGHost :: LoadIPToCountryDataOpt( )
+ {
+-	bool oldips = true;
++try {	bool oldips = true;
+ 
+ 	intmax_t file_len;
+ 	file_len = file_size("ip-to-country.csv");
+@@ -2293,7 +2294,10 @@
+ 		m_DBLocal->RunQuery("DETACH DATABASE ips");
+ 		CONSOLE_Print("[GHOST] iptocountry loading finished in "+UTIL_ToString(GetTicks()-tim)+" ms");
+ 	}
++} catch (...) {
++CONSOLE_Print("[GHOST] iptocountry not loaded");
+ }
++}
+ 
+ void CGHost :: LoadIPToCountryData( )
+ {
+@@ -3619,6 +3623,7 @@
+ 		CONSOLE_Print("[WTV] WaaaghTV is not enabled.");
+ 	m_BindAddress = CFG->GetString( "bot_bindaddress", string( ) );
+ 	m_HostPort = CFG->GetInt( "bot_hostport", 6112 );
++	m_ReconnectPort = m_HostPort + 200;
+ 	m_MaxGames = CFG->GetInt( "bot_maxgames", 5 );
+ 	string BotCommandTrigger = CFG->GetString( "bot_commandtrigger", "!" );
+ 
+Index: bnlsclient.cpp
+===================================================================
+--- bnlsclient.cpp	(revision 258)
++++ bnlsclient.cpp	(working copy)
+@@ -25,6 +25,8 @@
+ #include "bnlsprotocol.h"
+ #include "bnlsclient.h"
+ 
++extern CGHost* gGHost;
++
+ //
+ // CBNLSClient
+ //
+@@ -126,7 +128,7 @@
+ 	if( !m_Socket->GetConnecting( ) && !m_Socket->GetConnected( ) && !m_WasConnected )
+ 	{
+ 		CONSOLE_Print( "[BNLSC: " + m_Server + ":" + UTIL_ToString( m_Port ) + ":C" + UTIL_ToString( m_WardenCookie ) + "] connecting to server [" + m_Server + "] on port " + UTIL_ToString( m_Port ) );
+-		m_Socket->Connect( string( ), m_Server, m_Port );
++		m_Socket->Connect( gGHost->m_BindAddress, m_Server, m_Port );
+ 		return false;
+ 	}
+ 
+Index: bnet.cpp
+===================================================================
+--- bnet.cpp	(revision 258)
++++ bnet.cpp	(working copy)
+@@ -881,7 +881,7 @@
+ 	{
+ 		// the socket has an error
+ 
+-		uint32_t timetowait = 90;
++		uint32_t timetowait = 1800;
+ 		if (m_PasswordHashType == "pvpgn")
+ 			timetowait = 30;
+ 
+@@ -907,7 +907,7 @@
+ 	{
+ 		// the socket was disconnected
+ 
+-		uint32_t timetowait = 90;
++		uint32_t timetowait = 1800;
+ 		if (m_PasswordHashType == "pvpgn")
+ 			timetowait = 30;
+ 
+@@ -1010,7 +1010,7 @@
+ 		return m_Exiting;
+ 	}
+ 
+-	uint32_t timetowait = 90;
++	uint32_t timetowait = 1800;
+ 	if (m_PasswordHashType == "pvpgn")
+ 		timetowait = 30;
+ 

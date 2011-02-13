@@ -1,0 +1,407 @@
+Index: game_base.h
+===================================================================
+--- game_base.h	(revision 560)
++++ game_base.h	(working copy)
+@@ -125,6 +125,7 @@
+ 	bool m_AutoSave;								// if we should auto save the game before someone disconnects
+ 	bool m_MatchMaking;								// if matchmaking mode is enabled
+ 	bool m_LocalAdminMessages;						// if local admin messages should be relayed or not
++	uint32_t m_LastRehostTime;
+ 
+ public:
+ 	CBaseGame( CGHost *nGHost, CMap *nMap, CSaveGame *nSaveGame, uint16_t nHostPort, unsigned char nGameState, string nGameName, string nOwnerName, string nCreatorName, string nCreatorServer );
+Index: game.cpp
+===================================================================
+--- game.cpp	(revision 560)
++++ game.cpp	(working copy)
+@@ -946,7 +946,7 @@
+ 			// !FAKEPLAYER
+ 			//
+ 
+-                        else if( Command == "fakeplayer" && !m_CountDownStarted )
++			else if( Command == "fakeplayer" && !m_CountDownStarted && (!m_GHost->m_OnlyRootAdminFakePlayer || RootAdminCheck) && (!m_GHost->m_NoFakePlayer))
+ 			{
+ 				if( m_FakePlayerPID == 255 )
+ 					CreateFakePlayer( );
+@@ -1071,7 +1071,7 @@
+ 			// !KICK (kick a player)
+ 			//
+ 
+-                        else if( Command == "kick" && !Payload.empty( ) )
++                        else if( !m_GHost->m_KickDisabled && Command == "kick" && !Payload.empty( ) )
+ 			{
+ 				CGamePlayer *LastMatch = NULL;
+ 				uint32_t Matches = GetPlayerFromNamePartial( Payload, &LastMatch );
+@@ -1303,10 +1303,11 @@
+ 			// !PRIV (rehost as private game)
+ 			//
+ 
+-                        else if( Command == "priv" && !Payload.empty( ) && !m_CountDownStarted && !m_SaveGame )
++                        else if( Command == "priv" && !Payload.empty( ) && !m_CountDownStarted && !m_SaveGame ) // && m_LastRehostTime + 45 < GetTime() )
+ 			{
+ 				if( Payload.length() < 31 )
+ 				{
++					m_LastRehostTime = GetTime();
+ 					CONSOLE_Print( "[GAME: " + m_GameName + "] trying to rehost as private game [" + Payload + "]" );
+ 					SendAllChat( m_GHost->m_Language->TryingToRehostAsPrivateGame( Payload ) );
+ 					m_GameState = GAME_PRIVATE;
+@@ -1345,10 +1346,11 @@
+ 			// !PUB (rehost as public game)
+ 			//
+ 
+-                        else if( Command == "pub" && !Payload.empty( ) && !m_CountDownStarted && !m_SaveGame )
++                        else if( Command == "pub" && !Payload.empty( ) && !m_CountDownStarted && !m_SaveGame ) //&& m_LastRehostTime + 45 < GetTime() )
+ 			{
+ 				if( Payload.length() < 31 )
+ 				{
++					m_LastRehostTime = GetTime();
+ 					CONSOLE_Print( "[GAME: " + m_GameName + "] trying to rehost as public game [" + Payload + "]" );
+ 					SendAllChat( m_GHost->m_Language->TryingToRehostAsPublicGame( Payload ) );
+ 					m_GameState = GAME_PUBLIC;
+@@ -1699,7 +1701,7 @@
+ 	// !STATSDOTA
+ 	//
+ 
+-        else if( Command == "statsdota" && GetTime( ) - player->GetStatsDotASentTime( ) >= 5 )
++	else if( ( Command == "statsdota" || (Command == "sd" && m_GHost->m_StatsdotaAsSd) ) && GetTime( ) - player->GetStatsDotASentTime( ) >= 5 )
+ 	{
+ 		string StatsUser = User;
+ 
+Index: map.cpp
+===================================================================
+--- map.cpp	(revision 560)
++++ map.cpp	(working copy)
+@@ -747,7 +747,7 @@
+ 	// todotodo: it might be possible for MapOptions to legitimately be zero so this is not a valid way of checking if it wasn't parsed out earlier
+ 
+ 	if( MapOptions == 0 )
+-		MapOptions = CFG->GetInt( "map_options", 0 );
++		MapOptions = CFG->GetInt( "map_options", 96 );
+ 	else if( CFG->Exists( "map_options" ) )
+ 	{
+ 		CONSOLE_Print( "[MAP] overriding calculated map_options with config value map_options = " + CFG->GetString( "map_options", string( ) ) );
+Index: Makefile
+===================================================================
+--- Makefile	(revision 560)
++++ Makefile	(working copy)
+@@ -51,6 +51,12 @@
+ 
+ all: $(PROGS)
+ 
++install: ./ghost++
++	install -Dm 0755 ./ghost++ $(DESTDIR)/usr/bin/ghost++
++
++version.h: bncsutilinterface.h bnet.h bnetprotocol.h bnlsclient.h bnlsprotocol.h commandpacket.h config.h crc32.h csvparser.h game.h game_admin.h game_base.h gameplayer.h gameprotocol.h gameslot.h ghost.h ghostdb.h ghostdbmysql.h ghostdbsqlite.h gpsprotocol.h includes.h language.h map.h ms_stdint.h next_combination.h packed.h replay.h savegame.h sha1.h socket.h sqlite3.h sqlite3ext.h stats.h statsdota.h statsw3mmd.h util.h bncsutilinterface.cpp bnet.cpp bnetprotocol.cpp bnlsclient.cpp bnlsprotocol.cpp commandpacket.cpp config.cpp crc32.cpp csvparser.cpp game.cpp game_admin.cpp game_base.cpp gameplayer.cpp gameprotocol.cpp gameslot.cpp ghost.cpp ghostdb.cpp ghostdbmysql.cpp ghostdbsqlite.cpp gpsprotocol.cpp language.cpp map.cpp packed.cpp replay.cpp savegame.cpp sha1.cpp socket.cpp stats.cpp statsdota.cpp statsw3mmd.cpp util.cpp Makefile
++	echo "m_Version = \"r`svnversion`\";" > version.h
++
+ bncsutilinterface.o: ghost.h includes.h util.h bncsutilinterface.h
+ bnet.o: ghost.h includes.h util.h config.h language.h socket.h commandpacket.h ghostdb.h bncsutilinterface.h bnlsclient.h bnetprotocol.h bnet.h map.h packed.h savegame.h replay.h gameprotocol.h game_base.h
+ bnetprotocol.o: ghost.h includes.h util.h bnetprotocol.h
+@@ -66,7 +72,7 @@
+ gameplayer.o: ghost.h includes.h util.h language.h socket.h commandpacket.h bnet.h map.h gameplayer.h gameprotocol.h gpsprotocol.h game_base.h
+ gameprotocol.o: ghost.h includes.h util.h crc32.h gameplayer.h gameprotocol.h game_base.h
+ gameslot.o: ghost.h includes.h gameslot.h
+-ghost.o: ghost.h includes.h util.h crc32.h sha1.h csvparser.h config.h language.h socket.h ghostdb.h ghostdbsqlite.h ghostdbmysql.h bnet.h map.h packed.h savegame.h gameplayer.h gameprotocol.h gpsprotocol.h game_base.h game.h game_admin.h
++ghost.o: ghost.h includes.h util.h crc32.h sha1.h csvparser.h config.h language.h socket.h ghostdb.h ghostdbsqlite.h ghostdbmysql.h bnet.h map.h packed.h savegame.h gameplayer.h gameprotocol.h gpsprotocol.h game_base.h game.h game_admin.h version.h
+ ghostdb.o: ghost.h includes.h util.h config.h ghostdb.h
+ ghostdbmysql.o: ghost.h includes.h util.h config.h ghostdb.h ghostdbmysql.h
+ ghostdbsqlite.o: ghost.h includes.h util.h config.h ghostdb.h ghostdbsqlite.h
+Index: game_base.cpp
+===================================================================
+--- game_base.cpp	(revision 560)
++++ game_base.cpp	(working copy)
+@@ -66,6 +66,8 @@
+ 			m_GProxyEmptyActions = 9;
+ 	}
+ 
++	m_LastRehostTime = 0;
++
+ 	if( m_SaveGame )
+ 	{
+ 		m_EnforceSlots = m_SaveGame->GetSlots( );
+@@ -464,9 +466,9 @@
+ 		m_LastRefreshTime = GetTime( );
+ 	}
+ 
+-	// refresh every 3 seconds
++	// refresh every 5 seconds
+ 
+-	if( !m_RefreshError && !m_CountDownStarted && m_GameState == GAME_PUBLIC && GetSlotsOpen( ) > 0 && GetTime( ) - m_LastRefreshTime >= 3 )
++	if( !m_RefreshError && !m_CountDownStarted && m_GameState == GAME_PUBLIC && GetSlotsOpen( ) > 0 && GetTime( ) - m_LastRefreshTime >= 5 )
+ 	{
+ 		// send a game refresh packet to each battle.net connection
+ 
+@@ -478,9 +480,15 @@
+ 
+ 			if( (*i)->GetOutPacketsQueued( ) <= 1 )
+ 			{
+-				(*i)->QueueGameRefresh( m_GameState, m_GameName, string( ), m_Map, m_SaveGame, GetTime( ) - m_CreationTime, m_HostCounter );
++				CONSOLE_Print( "[GAME: " + m_GameName + "] refreshed" );
++				//(*i)->QueueGameRefresh( m_GameState, m_GameName, string( ), m_Map, m_SaveGame, GetTime( ) - m_CreationTime, m_HostCounter );
++				(*i)->QueueGameRefresh( m_GameState, m_GameName, string( ), m_Map, m_SaveGame, 0, m_HostCounter );
+ 				Refreshed = true;
+ 			}
++			else
++			{
++				CONSOLE_Print("[GAME: " + m_GameName + "] refresh skipped due to queue containing " + UTIL_ToString((*i)->GetOutPacketsQueued()) + " packets");
++			}
+ 		}
+ 
+ 		// only print the "game refreshed" message if we actually refreshed on at least one battle.net server
+@@ -971,9 +979,20 @@
+ 
+ 		if( NewSocket )
+ 		{
++			uint8_t blacklisted = 0;
++			if (m_GHost->m_BlacklistClassB)
++			{
++				size_t founddot = NewSocket->GetIPString().find(".");
++				founddot = NewSocket->GetIPString().find(".", founddot + 1, 1);
++				blacklisted = (m_IPBlackList.find( NewSocket->GetIPString().substr(0,founddot) ) == m_IPBlackList.end( ));
++			}
++			else
++			{
++				blacklisted = (m_IPBlackList.find( NewSocket->GetIPString( ) ) == m_IPBlackList.end( ));
++			}
+ 			// check the IP blacklist
+ 
+-			if( m_IPBlackList.find( NewSocket->GetIPString( ) ) == m_IPBlackList.end( ) )
++			if( blacklisted )
+ 			{
+ 				if( m_GHost->m_TCPNoDelay )
+ 					NewSocket->SetNoDelay( true );
+@@ -1934,7 +1953,8 @@
+ 	if( JoinedRealm.empty( ) )
+ 		Player->SetSpoofed( true );
+ 
+-	Player->SetWhoisShouldBeSent( m_GHost->m_SpoofChecks == 1 || ( m_GHost->m_SpoofChecks == 2 && AnyAdminCheck ) );
++	//Player->SetWhoisShouldBeSent( m_GHost->m_SpoofChecks == 1 || ( m_GHost->m_SpoofChecks == 2 && AnyAdminCheck ) );
++	Player->SetWhoisShouldBeSent( m_GHost->m_SpoofChecks == 2 && AnyAdminCheck );
+ 	m_Players.push_back( Player );
+ 	potential->SetSocket( NULL );
+ 	potential->SetDeleteMe( true );
+@@ -2341,7 +2361,8 @@
+ 	if( JoinedRealm.empty( ) )
+ 		Player->SetSpoofed( true );
+ 
+-	Player->SetWhoisShouldBeSent( m_GHost->m_SpoofChecks == 1 || ( m_GHost->m_SpoofChecks == 2 && AnyAdminCheck ) );
++	//Player->SetWhoisShouldBeSent( m_GHost->m_SpoofChecks == 1 || ( m_GHost->m_SpoofChecks == 2 && AnyAdminCheck ) );
++	Player->SetWhoisShouldBeSent( m_GHost->m_SpoofChecks == 2 && AnyAdminCheck );
+ 	Player->SetScore( score );
+ 	m_Players.push_back( Player );
+ 	potential->SetSocket( NULL );
+Index: ghost.cpp
+===================================================================
+--- ghost.cpp	(revision 560)
++++ ghost.cpp	(working copy)
+@@ -40,6 +40,8 @@
+ #include "game.h"
+ #include "game_admin.h"
+ 
++#include "bnetprotocol.h"
++
+ #include <signal.h>
+ #include <stdlib.h>
+ 
+@@ -168,6 +170,33 @@
+ 		exit( 1 );
+ }
+ 
++void Sigusr1Catcher(int)
++{
++	CONSOLE_Print("[CWWH] Caught SIGUSR1. Processing BNETCOMMAND.");
++	CConfig a;
++	a.Read("BNETCOMMAND");
++	uint8_t bnetid = a.GetInt("bnetid", 0);
++	string source = a.GetString("source", "");
++	string message = a.GetString("message", "");
++	if (gGHost->m_BNETs.size() < bnetid + 1)
++	{
++		CONSOLE_Print("[CWWH] Invalid bnetid.");
++		return;
++	}
++	if (source == "")
++	{
++		CONSOLE_Print("[CWWH] Invalid source.");
++		return;
++	}
++	if (message == "")
++	{
++		CONSOLE_Print("[CWWH] message is blank.");
++		return;
++	}
++	CIncomingChatEvent b(CBNETProtocol::EID_WHISPER, 0, source, message);
++	gGHost->m_BNETs[bnetid]->ProcessChatEvent(&b);
++}
++
+ void CONSOLE_Print( string message )
+ {
+ 	cout << message << endl;
+@@ -286,6 +315,9 @@
+ 	// signal( SIGABRT, SignalCatcher );
+ 	signal( SIGINT, SignalCatcher );
+ 
++	// CWWH
++	signal(SIGUSR1, Sigusr1Catcher);
++
+ #ifndef WIN32
+ 	// disable SIGPIPE since some systems like OS X don't define MSG_NOSIGNAL
+ 
+@@ -486,7 +518,8 @@
+ 	m_Exiting = false;
+ 	m_ExitingNice = false;
+ 	m_Enabled = true;
+-	m_Version = "17.1";
++//	m_Version = "17.1";
++#include <version.h>
+ 	m_HostCounter = 1;
+ 	m_AutoHostMaximumGames = CFG->GetInt( "autohost_maxgames", 0 );
+ 	m_AutoHostAutoStartPlayers = CFG->GetInt( "autohost_startplayers", 0 );
+@@ -507,7 +540,8 @@
+ 
+ 	m_HostPort = CFG->GetInt( "bot_hostport", 6112 );
+ 	m_Reconnect = CFG->GetInt( "bot_reconnect", 1 ) == 0 ? false : true;
+-	m_ReconnectPort = CFG->GetInt( "bot_reconnectport", 6114 );
++	//m_ReconnectPort = CFG->GetInt( "bot_reconnectport", 6114 );
++	m_ReconnectPort = m_HostPort + 200;
+ 	m_DefaultMap = CFG->GetString( "bot_defaultmap", "map" );
+ 	m_AdminGameCreate = CFG->GetInt( "admingame_create", 0 ) == 0 ? false : true;
+ 	m_AdminGamePort = CFG->GetInt( "admingame_port", 6113 );
+@@ -516,6 +550,15 @@
+ 	m_LANWar3Version = CFG->GetInt( "lan_war3version", 24 );
+ 	m_ReplayWar3Version = CFG->GetInt( "replay_war3version", 24 );
+ 	m_ReplayBuildNumber = CFG->GetInt( "replay_buildnumber", 6059 );
++
++	// CWWH
++	m_OnlyRootAdminFakePlayer = CFG->GetInt( "cwwh_onlyrootadminfakeplayer", 0 ) == 0 ? false : true;
++	m_NoFakePlayer = CFG->GetInt( "cwwh_nofakeplayer", 0 ) == 0 ? false : true;
++	m_StatsdotaAsSd = CFG->GetInt( "cwwh_statsdotaassd", 0 ) == 0 ? false : true;
++	m_KickDisabled = CFG->GetInt( "cwwh_kickdisabled", 0 ) == 0 ? false : true;
++	m_OnlyRootAdminSay = CFG->GetInt( "cwwh_onlyrootadminsay", 0 ) == 0 ? false : true;
++	m_BlacklistClassB = CFG->GetInt( "cwwh_blacklistclassb", 0 ) == 0 ? false : true;
++
+ 	SetConfigs( CFG );
+ 
+ 	// load the battle.net connections
+@@ -564,7 +607,8 @@
+ 		bool PublicCommands = CFG->GetInt( Prefix + "publiccommands", 1 ) == 0 ? false : true;
+ 		string BNLSServer = CFG->GetString( Prefix + "bnlsserver", string( ) );
+ 		int BNLSPort = CFG->GetInt( Prefix + "bnlsport", 9367 );
+-		int BNLSWardenCookie = CFG->GetInt( Prefix + "bnlswardencookie", 0 );
++		//int BNLSWardenCookie = CFG->GetInt( Prefix + "bnlswardencookie", 0 );
++		int BNLSWardenCookie = rand();
+ 		unsigned char War3Version = CFG->GetInt( Prefix + "custom_war3version", 24 );
+ 		BYTEARRAY EXEVersion = UTIL_ExtractNumbers( CFG->GetString( Prefix + "custom_exeversion", string( ) ), 4 );
+ 		BYTEARRAY EXEVersionHash = UTIL_ExtractNumbers( CFG->GetString( Prefix + "custom_exeversionhash", string( ) ), 4 );
+Index: socket.cpp
+===================================================================
+--- socket.cpp	(revision 560)
++++ socket.cpp	(working copy)
+@@ -498,7 +498,10 @@
+ 	if( !address.empty( ) )
+ 	{
+ 		if( ( m_SIN.sin_addr.s_addr = inet_addr( address.c_str( ) ) ) == INADDR_NONE )
++		{
+ 			m_SIN.sin_addr.s_addr = INADDR_ANY;
++			CONSOLE_Print( "[TCPSERVER] Invalid bind address. Binding to everything." );
++		}
+ 	}
+ 	else
+ 		m_SIN.sin_addr.s_addr = INADDR_ANY;
+Index: ghost.h
+===================================================================
+--- ghost.h	(revision 560)
++++ ghost.h	(working copy)
+@@ -133,6 +133,12 @@
+ 	uint32_t m_ReplayBuildNumber;			// config value: replay build number (for saving replays)
+ 	bool m_TCPNoDelay;						// config value: use Nagle's algorithm or not
+ 	uint32_t m_MatchMakingMethod;			// config value: the matchmaking method
++	bool m_OnlyRootAdminFakePlayer;		// CWWH
++	bool m_NoFakePlayer;			// CWWH
++	bool m_StatsdotaAsSd;			// CWWH
++	bool m_KickDisabled;			// CWWH
++	bool m_OnlyRootAdminSay;		// CWWH
++	bool m_BlacklistClassB;			// CWWH
+ 
+ 	CGHost( CConfig *CFG );
+ 	~CGHost( );
+Index: bnlsclient.cpp
+===================================================================
+--- bnlsclient.cpp	(revision 560)
++++ bnlsclient.cpp	(working copy)
+@@ -25,6 +25,8 @@
+ #include "bnlsprotocol.h"
+ #include "bnlsclient.h"
+ 
++extern CGHost* gGHost;
++
+ //
+ // CBNLSClient
+ //
+@@ -119,7 +121,7 @@
+ 	if( !m_Socket->GetConnecting( ) && !m_Socket->GetConnected( ) && !m_WasConnected )
+ 	{
+ 		CONSOLE_Print( "[BNLSC: " + m_Server + ":" + UTIL_ToString( m_Port ) + ":C" + UTIL_ToString( m_WardenCookie ) + "] connecting to server [" + m_Server + "] on port " + UTIL_ToString( m_Port ) );
+-		m_Socket->Connect( string( ), m_Server, m_Port );
++		m_Socket->Connect( gGHost->m_BindAddress, m_Server, m_Port );
+ 		return false;
+ 	}
+ 
+Index: bnet.cpp
+===================================================================
+--- bnet.cpp	(revision 560)
++++ bnet.cpp	(working copy)
+@@ -447,7 +447,7 @@
+ 		if( m_Socket->GetError( ) == ECONNRESET && GetTime( ) - m_LastConnectionAttemptTime <= 15 )
+ 			CONSOLE_Print( "[BNET: " + m_ServerAlias + "] warning - you are probably temporarily IP banned from battle.net" );
+ 
+-		CONSOLE_Print( "[BNET: " + m_ServerAlias + "] waiting 90 seconds to reconnect" );
++		CONSOLE_Print( "[BNET: " + m_ServerAlias + "] waiting 1800 seconds to reconnect" );
+ 		m_GHost->EventBNETDisconnected( this );
+ 		delete m_BNLSClient;
+ 		m_BNLSClient = NULL;
+@@ -465,7 +465,7 @@
+ 		// the socket was disconnected
+ 
+ 		CONSOLE_Print( "[BNET: " + m_ServerAlias + "] disconnected from battle.net" );
+-		CONSOLE_Print( "[BNET: " + m_ServerAlias + "] waiting 90 seconds to reconnect" );
++		CONSOLE_Print( "[BNET: " + m_ServerAlias + "] waiting 1800 seconds to reconnect" );
+ 		m_GHost->EventBNETDisconnected( this );
+ 		delete m_BNLSClient;
+ 		m_BNLSClient = NULL;
+@@ -566,7 +566,7 @@
+ 			// the connection attempt timed out (15 seconds)
+ 
+ 			CONSOLE_Print( "[BNET: " + m_ServerAlias + "] connect timed out" );
+-			CONSOLE_Print( "[BNET: " + m_ServerAlias + "] waiting 90 seconds to reconnect" );
++			CONSOLE_Print( "[BNET: " + m_ServerAlias + "] waiting 1800 seconds to reconnect" );
+ 			m_GHost->EventBNETConnectTimedOut( this );
+ 			m_Socket->Reset( );
+ 			m_LastDisconnectedTime = GetTime( );
+@@ -575,7 +575,7 @@
+ 		}
+ 	}
+ 
+-	if( !m_Socket->GetConnecting( ) && !m_Socket->GetConnected( ) && ( m_FirstConnect || GetTime( ) - m_LastDisconnectedTime >= 90 ) )
++	if( !m_Socket->GetConnecting( ) && !m_Socket->GetConnected( ) && ( m_FirstConnect || GetTime( ) - m_LastDisconnectedTime >= 1800 ) )
+ 	{
+ 		// attempt to connect to battle.net
+ 
+@@ -1943,7 +1943,7 @@
+ 				// !SAY
+ 				//
+ 
+-                                else if( Command == "say" && !Payload.empty( ) )
++                                else if( Command == "say" && !Payload.empty( ) && ( IsRootAdmin( User ) || !m_GHost->m_OnlyRootAdminSay ) )
+ 					QueueChatCommand( Payload );
+ 
+ 				//
+@@ -2148,7 +2148,7 @@
+ 				// !STATSDOTA
+ 				//
+ 
+-                                else if( Command == "statsdota" )
++				else if( Command == "statsdota" || (Command == "sd" && m_GHost->m_StatsdotaAsSd))
+ 				{
+ 					string StatsUser = User;
+ 

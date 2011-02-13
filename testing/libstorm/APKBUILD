@@ -1,0 +1,44 @@
+# Contributor: CryptWizard <cryptwizard@gmail.com>
+# Maintainer: CryptWizard <cryptwizard@gmail.com>
+pkgname=libstorm
+pkgver=560
+pkgrel=3
+pkgdesc="MPQ (Blizzard Archive) Access Library"
+url="https://code.google.com/p/ghostplusplus/source/browse/?r=$pkgver#svn%2Ftrunk%2FStormLib%2Fstormlib"
+arch="all"
+license="Unknown"
+depends=""
+depends_dev="libbz2 zlib-dev"
+makedepends="$depends_dev"
+install=""
+subpackages=""
+source="
+	http://alpine-nl.cryptwizard.info/~cryptw-packaging/$pkgname-$pkgver.tar.bz2
+	support-DESTDIR-Makefile.patch
+"
+
+_builddir="$srcdir"/"$pkgname"-"$pkgver"
+
+prepare() {
+	local i
+	cd "$_builddir"
+	for i in $source; do
+		case $i in
+		*.patch) msg $i; patch -p0 -i "$srcdir"/$i || return 1;;
+		esac
+	done
+	
+	cd "$srcdir"
+}
+
+build() {
+	cd "$_builddir"
+	make || return 1
+}
+
+package() {
+	cd "$_builddir"
+	make DESTDIR="$pkgdir" install || return 1
+}
+md5sums="8b2ea0f9181999107d6bdf633fc7a0be  libstorm-560.tar.bz2
+282580909e6d35ec2060237fffe38ae0  support-DESTDIR-Makefile.patch"
